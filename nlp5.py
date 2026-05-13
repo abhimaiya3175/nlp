@@ -1,65 +1,76 @@
 import nltk
-import numpy as np
 import pandas as pd
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import classification_report, accuracy_score
 
 nltk.download('stopwords')
 nltk.download('punkt')
+nltk.download('punkt_tab')
 
-data = pd.read_csv(r'Musical_instruments_reviews 4.csv')
+data = pd.read_csv(r'E:\nlp\Musical_instruments_reviews 4.csv')
 
-X = data.summary.astype(str)
-y = data.overall
+X = data['reviewText'].astype(str)
+y = data['overall']
 
 stop_words = set(stopwords.words('english'))
 
 def preprocess(text):
     words = word_tokenize(text.lower())
-    return [w for w in words if w.isalpha() and w not in stop_words]
+    words = [word for word in words if word.isalpha() and word not in stop_words]
+    return " ".join(words)
+
+X = X.apply(preprocess)
 
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=1, stratify=y
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
 )
 
-X_train = X_train.apply(preprocess)
-X_test = X_test.apply(preprocess)
+vectorizer = TfidfVectorizer(
+    max_features=5000,
+    ngram_range=(1,2)
+)
 
-vocab = sorted(set(word for sentence in X_train for word in sentence))
+X_train_vectors = vectorizer.fit_transform(X_train)
+X_test_vectors = vectorizer.transform(X_test)
 
-word_to_index = {word: i for i, word in enumerate(vocab)}
+model = MultinomialNB(alpha=0.1)
 
-def get_vector(words):
-    vector = [0] * len(vocab)
-    for word in words:
-        if word in word_to_index:
-            vector[word_to_index[word]] += 1
-    return vector
+model.fit(X_train_vectors, y_train)
 
-train_vectors = np.array([get_vector(x) for x in X_train])
-test_vectors = np.array([get_vector(x) for x in X_test])
+y_pred = model.predict(X_test_vectors)
 
-model = LogisticRegression(max_iter=1000)
-model.fit(train_vectors, y_train)
+print("Accuracy:", accuracy_score(y_test, y_pred))
 
-y_pred = model.predict(test_vectors)
-
+print("\nClassification Report:\n")
 print(classification_report(y_test, y_pred))
 
-text = input("Enter review: ")
+while True:
 
-vector = get_vector(preprocess(text))
+    user_review = input("\nEnter Review (or type exit): ")
 
-pred = model.predict([vector])[0]
+    if user_review.lower() == "exit":
+        print("Program Ended")
+        break
 
-print("Rating:", pred)
+    processed_review = preprocess(user_review)
 
-if pred <= 2:
-    print("Bad")
-elif pred == 3:
-    print("Average")
-else:
-    print("Good")
+    user_vector = vectorizer.transform([processed_review])
+
+    prediction = model.predict(user_vector)[0]
+
+    print("\nPredicted Rating:", prediction)
+
+    if prediction <= 2:
+        print("Sentiment: Bad")
+    elif prediction == 3:
+        print("Sentiment: Average")
+    else:
+        print("Sentiment: Good")
