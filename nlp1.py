@@ -96,7 +96,6 @@ def summarizer(text, length):
 
         sentence_scores[sentence] = score
 
-    # sort sentences based on score
     sorted_sentences = sorted(
         sentence_scores.items(),
         key=lambda x: x[1],
